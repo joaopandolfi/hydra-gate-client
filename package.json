@@ -1,0 +1,25 @@
+{
+  "name": "hydra-gate-client",
+  "version": "1.0.0",
+  "description": "Client to user hydra gate and expose local server",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joaopandolfi/hydra-gate-client.git"
+  },
+  "author": "joaopandolfi",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/joaopandolfi/hydra-gate-client/issues"
+  },
+  "homepage": "https://github.com/joaopandolfi/hydra-gate-client#readme",
+  "dependencies": {
+    "axios": "^0.19.2",
+    "contentful": "^7.1.0-beta1",
+    "socket.io-client": "^2.3.0",
+    "uuid": "^8.1.0"
+  }
+}
