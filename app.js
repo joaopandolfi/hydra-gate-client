@@ -9,9 +9,9 @@ const uuid = require('uuid')
 
 var Configs = {
     ID: uuid.v1(),
-    server: "http://localhost:8888",
+    server: "https://hydralabs.ml",
     token:"",
-    predictUrl: "http://localhost:8888/x"
+    predictUrl: "http://localhost:8991/rest/login"
 }
 
 console.log(`[+] Server ID: ${Configs.ID}`)
@@ -36,22 +36,22 @@ socket.on("registered",(data)=>{
     console.log(`[+] Authenticated -> ${data.sid}`)
 })
 
-// @receives {id:uuid,data:any, timestamp:Date}
-socket.on("predict",(payload)=>{
+// @receives {id:uuid,data:any,method:Method, path:path, timestamp:Date}
+socket.on("handle",(payload)=>{
     console.log(`[+] <== pred: id [${payload.id}] timestamp [${payload.timestamp}]`)
     axios({
-        method:"POST",
-        url:Configs.predictUrl,
+        method:payload.method,
+        url:Configs.predictUrl+payload.path,
         data:payload.data
       })
     .then(result =>{
         console.log(`[+] ==> pred: id [${payload.id}] timestamp [${(new Date()).getTime()}]`)
-        socket.emit('predicted',{id:payload.id,success:true,data:result.data})
+        socket.emit('response',{id:payload.id,success:true,data:result.data})
     } )
     .catch(err => {
-        console.log(err)
+        //console.log(err)
         console.log(`[-] x=x Error on predict: id [${payload.id}] timestamp [${(new Date()).getTime()}] error [${err}]`)
-        socket.emit('predicted',{id:payload.id,success:false,data:{}})
+        socket.emit('response',{id:payload.id,success:false,data:{}})
   })
 })
 

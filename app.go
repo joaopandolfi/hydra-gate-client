@@ -34,7 +34,7 @@ func main() {
 	config = Config{
 		PingFrequency: 10 * time.Second,
 		HTTPTimeout:   10 * time.Second,
-		PostURL:       "http://localhost:8888/x",
+        PostURL:       "http://localhost:8080",
 		ServerURL:     "127.0.0.1",
 		ServerPort:    8888,
 		Secure:        false,
@@ -62,8 +62,8 @@ func httpClient(timeout time.Duration) {
 	}
 }
 
-func post(url string, data []byte) ([]byte, error) {
-	req, _ := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
+func sendHTTP(url, path, method string, data []byte) ([]byte, error) {
+	req, _ := http.NewRequest(method, url+path, bytes.NewBuffer(data))
 
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(context.Background())
@@ -127,20 +127,20 @@ func sockRoutine(cf *Config) {
 		log.Printf("[+] Authenticated -> %v", args["sid"])
 	})
 
-	_ = c.On("predict", func(h *gosocketio.Channel, args map[string]interface{}) {
-		log.Printf("[+] <== pred: id [%v] timestamp [%v]", args["id"], args["timestamp"])
+	_ = c.On("handle", func(h *gosocketio.Channel, args map[string]interface{}) {
+		log.Printf("[+] <== handle: id [%v] timestamp [%v] method [%v] path[%v]", args["id"], args["timestamp"],args["method"],args["path"])
 
 		payload, _ := json.Marshal(args["data"])
 
-		data, err := post(cf.PostURL, payload)
+		data, err := sendHTTP(cf.PostURL,args["path"].(string),args["method"].(string), payload)
 		if err != nil {
-			log.Printf("[-] x=x Error on predict: id [%v] timestamp [%v]", args["id"], time.Now().UTC())
-			c.Emit("predicted", map[string]interface{}{"id": args["id"], "success": false, "data": map[string]interface{}{}})
+			log.Printf("[-] x=x Error on handle: id [%v] timestamp [%v] method[%v] path[%v]", args["id"], time.Now().UTC(),args["method"],args["path"])
+			c.Emit("response", map[string]interface{}{"id": args["id"], "success": false, "data": map[string]interface{}{}})
 			return
 		}
 
 		log.Printf("[+] ==> pred: id [%v] timestamp [%v]", args["id"], time.Now().UTC())
-		c.Emit("predicted", map[string]interface{}{"id": args["id"], "success": true, "data": string(data)})
+		c.Emit("response", map[string]interface{}{"id": args["id"], "success": true, "data": string(data)})
 	})
 
 	go ping(c, cf.PingFrequency)
