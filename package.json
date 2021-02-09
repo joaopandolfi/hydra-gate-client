@@ -17,8 +17,8 @@
   },
   "homepage": "https://github.com/joaopandolfi/hydra-gate-client#readme",
   "dependencies": {
-    "axios": "^0.19.2",
-    "contentful": "^7.1.0-beta1",
+    "axios": "^0.21.1",
+    "contentful": "^8.1.7",
     "socket.io-client": "^2.3.0",
     "uuid": "^8.1.0"
   }
