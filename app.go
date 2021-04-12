@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	b64 "encoding/base64"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -28,17 +29,27 @@ type Config struct {
 	HTTPTimeout   time.Duration
 	PingFrequency time.Duration
 	Token         string
+	ID            string
+}
+
+type response struct {
+	ID      string      `json:"id"`
+	Success bool        `json:"success"`
+	Data    string      `json:"data"`
+	Header  http.Header `json:"header"`
 }
 
 func main() {
+	uid, _ := uuid.NewUUID()
 	config = Config{
 		PingFrequency: 10 * time.Second,
 		HTTPTimeout:   10 * time.Second,
-        PostURL:       "http://localhost:8080",
-		ServerURL:     "127.0.0.1",
-		ServerPort:    8888,
+		PostURL:       "https://google.com",
+		ServerURL:     "127.0.0.1:1223/socket.io/?EIO=3&transport=websocket",
+		ServerPort:    1223,
 		Secure:        false,
-		Token:         "",
+		Token:         "x",
+		ID:            uid.String(),
 	}
 
 	cx := make(chan int, 1)
@@ -62,18 +73,18 @@ func httpClient(timeout time.Duration) {
 	}
 }
 
-func sendHTTP(url, path, method string, data []byte) ([]byte, error) {
+func sendHTTP(url, path, method string, data []byte) ([]byte, http.Header, error) {
 	req, _ := http.NewRequest(method, url+path, bytes.NewBuffer(data))
 
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(context.Background())
 	resp, err := httpC.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 
-	return body, err
+	return body, resp.Header, err
 }
 
 func ping(c *gosocketio.Client, frequency time.Duration) {
@@ -111,12 +122,14 @@ func sockRoutine(cf *Config) {
 
 	err = c.On(gosocketio.OnConnection, func(h *gosocketio.Channel) {
 		log.Println("[+] Connected")
+		log.Println("[-] Authenticating")
+		c.Emit("register", map[string]string{"id": cf.ID, "token": cf.Token})
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	_ = c.On("welcome", func(h *gosocketio.Channel, args map[string]interface{}) {
+	_ = c.On("welcomes", func(h *gosocketio.Channel, args map[string]interface{}) {
 		log.Printf("[+] Welcome message: %v", args)
 		log.Println("[-] Authenticating")
 		id, _ := uuid.NewUUID()
@@ -124,23 +137,24 @@ func sockRoutine(cf *Config) {
 	})
 
 	_ = c.On("registered", func(h *gosocketio.Channel, args map[string]interface{}) {
-		log.Printf("[+] Authenticated -> %v", args["sid"])
+		log.Printf("[+] Authenticated -> %v -> %v", args["sid"], cf.ID)
 	})
 
 	_ = c.On("handle", func(h *gosocketio.Channel, args map[string]interface{}) {
-		log.Printf("[+] <== handle: id [%v] timestamp [%v] method [%v] path[%v]", args["id"], args["timestamp"],args["method"],args["path"])
+		log.Printf("[+] <== handle: id [%v] timestamp [%v] method [%v] path[%v]", args["id"], args["timestamp"], args["method"], args["path"])
 
 		payload, _ := json.Marshal(args["data"])
 
-		data, err := sendHTTP(cf.PostURL,args["path"].(string),args["method"].(string), payload)
+		data, head, err := sendHTTP(cf.PostURL, args["path"].(string), args["method"].(string), payload)
 		if err != nil {
-			log.Printf("[-] x=x Error on handle: id [%v] timestamp [%v] method[%v] path[%v]", args["id"], time.Now().UTC(),args["method"],args["path"])
-			c.Emit("response", map[string]interface{}{"id": args["id"], "success": false, "data": map[string]interface{}{}})
+			log.Printf("[-] x=x Error on handle: id [%v] timestamp [%v] method[%v] path[%v]", args["id"], time.Now().UTC(), args["method"], args["path"])
+			c.Emit("response", response{ID: args["id"].(string), Success: false, Data: ""})
 			return
 		}
 
-		log.Printf("[+] ==> pred: id [%v] timestamp [%v]", args["id"], time.Now().UTC())
-		c.Emit("response", map[string]interface{}{"id": args["id"], "success": true, "data": string(data)})
+		log.Printf("[+] ==> pred: id [%v] timestamp [%v] path [%v]", args["id"], time.Now().UTC(), args["path"].(string))
+		datab64 := b64.StdEncoding.EncodeToString(data)
+		c.Emit("response", response{ID: args["id"].(string), Success: true, Data: datab64, Header: head})
 	})
 
 	go ping(c, cf.PingFrequency)
