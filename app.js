@@ -9,7 +9,7 @@ const uuid = require('uuid')
 
 var Configs = {
     ID: uuid.v1(),
-    server: "https://hydralabs.ml",
+    server: "http://localhost:8888",
     token:"",
     predictUrl: "http://localhost:8991/rest/login"
 }
@@ -17,8 +17,11 @@ var Configs = {
 console.log(`[+] Server ID: ${Configs.ID}`)
 console.log(`[+] Connecting on server -> ${Configs.server}`)
 
-const socket = io.connect(Configs.server)
-
+const socket = io.connect(Configs.server,
+    { 
+        transports: ['websocket'], 
+        query:""});
+  
 socket.on('connect',()=>{
     console.log(`[+] Connected`)
 })
